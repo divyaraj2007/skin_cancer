@@ -1,0 +1,36 @@
+{
+  "accuracy": 0.8214285714285714,
+  "weighted_precision": 0.8382034632034632,
+  "weighted_recall": 0.8214285714285714,
+  "weighted_f1": 0.8001131221719457,
+  "hard_to_distinguish_pairs": [
+    {
+      "actual": "df",
+      "predicted": "nv",
+      "misclassified_count": 5,
+      "actual_class_total": 10,
+      "misclassification_rate": 0.5
+    },
+    {
+      "actual": "df",
+      "predicted": "bkl",
+      "misclassified_count": 3,
+      "actual_class_total": 10,
+      "misclassification_rate": 0.3
+    },
+    {
+      "actual": "nv",
+      "predicted": "df",
+      "misclassified_count": 1,
+      "actual_class_total": 6,
+      "misclassification_rate": 0.16666666666666666
+    },
+    {
+      "actual": "bkl",
+      "predicted": "nv",
+      "misclassified_count": 1,
+      "actual_class_total": 9,
+      "misclassification_rate": 0.1111111111111111
+    }
+  ]
+}
