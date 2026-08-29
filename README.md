@@ -9,7 +9,6 @@ Machine learning project for skin lesion classification using **MobileNetV2 (PyT
 Works immediately without downloading HAM10000:
 
 ```powershell
-cd D:\Cursor\Rearchpaper\skin_cancer_ml
 pip install -r requirements.txt
 python -m src.train --demo --epochs 10
 python -m src.predict data\processed\mel\mel_000.jpg
