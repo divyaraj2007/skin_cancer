@@ -15,7 +15,17 @@ import torch.nn as nn
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_recall_fscore_support
 from tqdm import tqdm
 
-from config import CLASS_LABELS, EPOCHS, LEARNING_RATE, MODEL_DIR, RESULTS_DIR
+from config import (
+    CLASS_LABELS,
+    DEMO_DIR,
+    EPOCHS,
+    LEARNING_RATE,
+    MALIGNANT_CLASSES,
+    MODEL_DIR,
+    PROJECT_ROOT,
+    PROCESSED_DIR,
+    RESULTS_DIR,
+)
 from src.data_loader import build_loaders
 from src.model import build_model, get_device
 
@@ -79,7 +89,7 @@ def plot_confusion_matrix(y_true, y_pred, out_path: Path) -> None:
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=CLASS_LABELS, yticklabels=CLASS_LABELS)
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
-    plt.title("Confusion Matrix")
+    plt.title("Confusion Matrix (Holdout Test Set)")
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close()
@@ -99,7 +109,7 @@ def plot_per_class_metrics(report: dict, out_path: Path) -> None:
     plt.ylim(0, 1.05)
     plt.ylabel("Score")
     plt.xlabel("Class")
-    plt.title("Per-Class Precision, Recall, and F1")
+    plt.title("Per-Class Precision, Recall, and F1 (Test Set)")
     plt.xticks(x, CLASS_LABELS, rotation=30, ha="right")
     plt.legend()
     plt.tight_layout()
@@ -131,12 +141,43 @@ def find_hard_to_distinguish_pairs(cm: np.ndarray) -> list[dict]:
     return sorted(pairs, key=lambda item: (item["misclassified_count"], item["misclassification_rate"]), reverse=True)
 
 
-def evaluate_model(model, val_loader, device, results_dir: Path) -> dict:
+def compute_clinical_safety_metrics(y_true: list[int], y_pred: list[int]) -> dict:
+    """Compute malignant sensitivity, specificity, and false negative rate safeguards."""
+    malignant_indices = {i for i, label in enumerate(CLASS_LABELS) if label in MALIGNANT_CLASSES}
+
+    true_mal = np.array([y in malignant_indices for y in y_true], dtype=bool)
+    pred_mal = np.array([y in malignant_indices for y in y_pred], dtype=bool)
+
+    tp = int(np.logical_and(true_mal, pred_mal).sum())
+    fn = int(np.logical_and(true_mal, ~pred_mal).sum())
+    fp = int(np.logical_and(~true_mal, pred_mal).sum())
+    tn = int(np.logical_and(~true_mal, ~pred_mal).sum())
+
+    total_mal = tp + fn
+    total_ben = tn + fp
+
+    sensitivity = tp / total_mal if total_mal > 0 else 0.0
+    specificity = tn / total_ben if total_ben > 0 else 0.0
+    fn_rate = fn / total_mal if total_mal > 0 else 0.0
+
+    return {
+        "malignant_sensitivity": sensitivity,
+        "benign_specificity": specificity,
+        "malignant_false_negative_rate": fn_rate,
+        "malignant_true_positives": tp,
+        "malignant_false_negatives": fn,
+        "benign_false_positives": fp,
+        "benign_true_negatives": tn,
+    }
+
+
+def evaluate_model(model, test_loader, device, results_dir: Path) -> dict:
+    """Evaluate model on holdout test loader with evaluation safeguards."""
     model.eval()
     y_true, y_pred = [], []
 
     with torch.no_grad():
-        for images, labels in val_loader:
+        for images, labels in test_loader:
             images = images.to(device)
             outputs = model(images)
             preds = outputs.argmax(dim=1).cpu().numpy()
@@ -159,12 +200,14 @@ def evaluate_model(model, val_loader, device, results_dir: Path) -> dict:
         zero_division=0,
     )
     hard_pairs = find_hard_to_distinguish_pairs(cm)
+    clinical_metrics = compute_clinical_safety_metrics(y_true, y_pred)
 
     metrics = {
         "accuracy": accuracy_score(y_true, y_pred),
         "weighted_precision": precision,
         "weighted_recall": recall,
         "weighted_f1": f1,
+        "clinical_safety": clinical_metrics,
         "hard_to_distinguish_pairs": hard_pairs[:10],
     }
 
@@ -180,17 +223,22 @@ def evaluate_model(model, val_loader, device, results_dir: Path) -> dict:
     return {"report": report, "metrics": metrics}
 
 
-def train(epochs: int = EPOCHS, demo: bool = False) -> Path:
+def train(epochs: int = EPOCHS, demo: bool = False, data_dir: Path | None = None) -> Path:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     device = get_device()
     print(f"Using device: {device}")
 
-    train_loader, val_loader, data_dir, classes = build_loaders()
-    print(f"Training on data from: {data_dir}")
-    print(f"Classes: {classes}")
-    print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
+    train_loader, val_loader, test_loader, resolved_data_dir, classes = build_loaders(
+        data_dir=data_dir, demo=demo
+    )
+    print(f"Training on data from: {resolved_data_dir}")
+    print(f"Classes ({len(classes)}): {classes}")
+    print(
+        f"Partition batches -> Train: {len(train_loader)}, "
+        f"Validation: {len(val_loader)}, Holdout Test: {len(test_loader)}"
+    )
 
     model = build_model(pretrained=True).to(device)
     criterion = nn.CrossEntropyLoss()
@@ -225,21 +273,40 @@ def train(epochs: int = EPOCHS, demo: bool = False) -> Path:
     torch.save({"model_state": model.state_dict(), "classes": CLASS_LABELS}, MODEL_DIR / "skin_cancer_model.pt")
 
     plot_history(history, RESULTS_DIR / "training_history.png")
-    evaluation = evaluate_model(model, val_loader, device, RESULTS_DIR)
+
+    # Evaluation Safeguard: Reload best checkpoint weights for holdout test set evaluation
+    if best_path.exists():
+        print("Evaluation Safeguard: Reloading best validation checkpoint for unbiased test set evaluation...")
+        best_checkpoint = torch.load(best_path, map_location=device, weights_only=False)
+        model.load_state_dict(best_checkpoint["model_state"])
+
+    evaluation = evaluate_model(model, test_loader, device, RESULTS_DIR)
+
+    # Make data path portable for summary
+    try:
+        portable_data_dir = str(resolved_data_dir.relative_to(PROJECT_ROOT))
+    except ValueError:
+        portable_data_dir = str(resolved_data_dir)
+
+    try:
+        portable_model_path = str(final_path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        portable_model_path = str(final_path)
 
     summary = {
         "epochs": epochs,
         "demo_mode": demo,
         "device": str(device),
-        "data_dir": str(data_dir),
-        "model_path": str(final_path),
+        "data_dir": portable_data_dir,
+        "model_path": portable_model_path,
         "val_accuracy": history["val_acc"][-1],
         "best_val_accuracy": best_val_acc,
         "val_loss": history["val_loss"][-1],
-        "accuracy": evaluation["metrics"]["accuracy"],
-        "weighted_precision": evaluation["metrics"]["weighted_precision"],
-        "weighted_recall": evaluation["metrics"]["weighted_recall"],
-        "weighted_f1": evaluation["metrics"]["weighted_f1"],
+        "test_accuracy": evaluation["metrics"]["accuracy"],
+        "test_weighted_precision": evaluation["metrics"]["weighted_precision"],
+        "test_weighted_recall": evaluation["metrics"]["weighted_recall"],
+        "test_weighted_f1": evaluation["metrics"]["weighted_f1"],
+        "clinical_safety": evaluation["metrics"]["clinical_safety"],
         "hard_to_distinguish_pairs": evaluation["metrics"]["hard_to_distinguish_pairs"],
         "classification_report": evaluation["report"],
     }
@@ -247,26 +314,24 @@ def train(epochs: int = EPOCHS, demo: bool = False) -> Path:
     with open(RESULTS_DIR / "training_summary.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    print("\nTraining complete.")
-    print(f"Model saved: {final_path}")
+    print("\nTraining & evaluation complete.")
+    print(f"Model checkpoint saved: {final_path}")
     print(f"Best validation accuracy: {best_val_acc:.4f}")
-    print(f"Results: {RESULTS_DIR}")
+    print(f"Holdout test accuracy: {evaluation['metrics']['accuracy']:.4f}")
+    print(f"Malignant sensitivity: {evaluation['metrics']['clinical_safety']['malignant_sensitivity']:.4f}")
+    print(f"Results recorded in: {RESULTS_DIR}")
 
     return final_path
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train skin cancer classifier")
+    parser = argparse.ArgumentParser(description="Train skin cancer classifier with evaluation safeguards")
     parser.add_argument("--epochs", type=int, default=EPOCHS)
-    parser.add_argument("--demo", action="store_true", help="Force demo dataset generation")
+    parser.add_argument("--demo", action="store_true", help="Train on synthetic demo dataset in data/demo")
+    parser.add_argument("--data-dir", type=Path, default=None, help="Custom data directory")
     args = parser.parse_args()
 
-    if args.demo:
-        from src.demo_data import generate_demo_dataset
-
-        generate_demo_dataset()
-
-    train(epochs=args.epochs, demo=args.demo)
+    train(epochs=args.epochs, demo=args.demo, data_dir=args.data_dir)
 
 
 if __name__ == "__main__":

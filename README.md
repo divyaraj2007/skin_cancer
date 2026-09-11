@@ -2,171 +2,164 @@
 
 Machine learning project for skin lesion classification using **MobileNetV2 (PyTorch)** transfer learning and the **HAM10000** class schema (7 classes).
 
-> **Note:** Uses PyTorch (compatible with Python 3.14). TensorFlow is not required.
+> **Note:** Uses PyTorch (compatible with Python 3.10 through 3.14). TensorFlow is not required.  
+> Detailed release specification: See [RELEASE.md](RELEASE.md).
 
-## Quick Start (Demo Mode)
+---
 
-Works immediately without downloading HAM10000:
+## Quick Start (Portable Setup & Demo Mode)
+
+Works immediately on Windows, Linux, and macOS without downloading external datasets:
 
 ```powershell
+# 1. Navigate to project root
+cd skin_cancer_ml
+
+# 2. Set up virtual environment
+python -m venv venv
+
+# Windows (PowerShell):
+.\venv\Scripts\Activate.ps1
+# Linux / macOS:
+# source venv/bin/activate
+
+# 3. Install dependencies
 pip install -r requirements.txt
-python -m src.train --demo --epochs 10
-python -m src.predict data\processed\mel\mel_000.jpg
+
+# 4. Train on isolated synthetic demo dataset (data/demo/)
+python -m src.train --demo --epochs 5
+
+# 5. Predict on demo image with evaluation safeguards
+python -m src.predict data/demo/mel/mel_000.jpg
+
+# 6. Launch interactive Streamlit interface
 streamlit run app.py
 ```
 
-## Real Image Sample
+---
 
-A real, no-logo dermoscopic sample image has been added for testing:
+## Real Image Benchmark Sample
+
+A verified real dermoscopic nevus sample image is included in `data/real_samples/`:
 
 ```text
 data/real_samples/nv/ISIC_0024307_nv_real.jpg
 ```
 
-Source: ISIC Archive / HAM10000, image `ISIC_0024307`. Metadata lists this image as a dermoscopic nevus case. License: CC-BY-NC. Attribution: ViDIR Group, Department of Dermatology, Medical University of Vienna.
+- **Source:** ISIC Archive / HAM10000, image `ISIC_0024307` (ViDIR Group, Medical University of Vienna).
+- **License:** CC BY-NC 4.0.
 
-Use this command to test prediction on the real sample:
+Test prediction with clinical safeguards:
 
 ```powershell
-python -m src.predict data\real_samples\nv\ISIC_0024307_nv_real.jpg
+python -m src.predict data/real_samples/nv/ISIC_0024307_nv_real.jpg
 ```
 
-For model training, prefer the full HAM10000 or ISIC dataset instead of the generated demo dataset. The demo images are only for pipeline testing.
+---
 
-## Project Structure
+## Project Structure & Data Separation
+
+Synthetic test images and real clinical research data are strictly separated:
 
 ```
 skin_cancer_ml/
-app.py                  # Streamlit web UI
-config.py               # Settings and class labels
-requirements.txt
-scripts/
-  prepare_ham10000.py
-src/
-  demo_data.py          # Synthetic demo dataset
-  data_loader.py
-  model.py
-  train.py
-  predict.py
-data/processed/         # Real HAM10000 sample images for training
-models/                 # Saved .pt models
-results/                # Charts and metrics
+├── app.py                      # Streamlit web UI with clinical disclaimer & ABCDE guide
+├── config.py                   # Central settings, split ratios, safety thresholds
+├── requirements.txt            # Streamlined dependencies (PyTorch + Streamlit)
+├── RELEASE.md                  # Comprehensive release specification
+├── scripts/
+│   ├── download_ham10000_samples.py  # Download real samples with lesion deduplication
+│   └── prepare_ham10000.py           # Prepare raw Dataverse files
+├── src/
+│   ├── demo_data.py            # Generates synthetic data strictly in data/demo/
+│   ├── data_loader.py          # Stratified train/val/test splits & anti-leakage guards
+│   ├── model.py                # MobileNetV2 architecture & transfer learning
+│   ├── train.py                # Training loop, checkpointing, and test evaluation
+│   └── predict.py              # Inference with input validation & risk safeguards
+├── data/
+│   ├── demo/                   # Isolated synthetic demo images
+│   ├── processed/              # Real HAM10000 processed sample images
+│   ├── raw/                    # Raw HAM10000 metadata CSV
+│   └── real_samples/           # Single benchmark cases
+├── models/                     # Saved .pt model checkpoints
+└── results/                    # Confusion matrix, metrics JSON, history plots
 ```
+
+---
+
+## Evaluation Safeguards & Protocol
+
+This project enforces rigorous evaluation safeguards to prevent data contamination and overly optimistic reporting:
+
+1. **Strict Data Separation:** Synthetic demo generation writes exclusively to `data/demo/` and will never overwrite or dilute real HAM10000 images in `data/processed/`.
+2. **Stratified 3-Way Partitioning:** Dataset is split into 70% Train, 15% Validation (for checkpoint selection), and 15% Holdout Test. Stratification preserves class proportions across all subsets.
+3. **Leakage Prevention:** Programmatic assertions verify zero index overlap between partitions (`train ∩ val = ∅`, `train ∩ test = ∅`, `val ∩ test = ∅`).
+4. **Lesion Deduplication:** Downloader scripts deduplicate rows by `lesion_id` to prevent multi-image lesions from leaking across partitions.
+5. **Model Selection Integrity:** The training pipeline reloads `models/best_model.pt` before running final evaluation on the holdout test set, ensuring that reported test metrics reflect the optimal checkpoint rather than an overfitted final epoch.
+6. **Clinical Safety Metrics:** Training evaluation automatically calculates malignant sensitivity, specificity, and false negative rates for high-risk categories (`mel`, `bcc`, `akiec`).
+7. **Inference Guards:** Inputs are validated for resolution ($\ge 32\times 32$) and non-blank variance ($\sigma \ge 3.0$). Top predictions with $< 40\%$ confidence are flagged as high uncertainty, and cases with $\ge 15\%$ combined malignant probability trigger clinical safety alerts even if the top predicted class is nominally benign.
+
+---
 
 ## Current Processed Dataset
 
-`data/processed` has been replaced with real HAM10000 dermoscopic images, not synthetic/demo images.
+`data/processed` contains 280 real HAM10000 dermoscopic images balanced across all 7 diagnostic classes:
 
-| Class | Real images |
-|-------|------------:|
-| akiec | 40 |
-| bcc | 40 |
-| bkl | 40 |
-| df | 40 |
-| mel | 40 |
-| nv | 40 |
-| vasc | 40 |
-| **Total** | **280** |
+| Class | Diagnostic Category | Nature | Images |
+|-------|---------------------|--------|-------:|
+| `akiec` | Actinic Keratosis / Bowen's disease | Pre-cancerous | 40 |
+| `bcc` | Basal Cell Carcinoma | Malignant | 40 |
+| `bkl` | Benign Keratosis (Solar Lentigo / Seborrheic) | Benign | 40 |
+| `df` | Dermatofibroma | Benign | 40 |
+| `mel` | Melanoma | Malignant | 40 |
+| `nv` | Melanocytic Nevi (Common Mole) | Benign | 40 |
+| `vasc` | Vascular Lesions (Angioma, Pyogenic Granuloma) | Benign | 40 |
+| **Total** | | | **280** |
 
-The images were downloaded using:
-
+Download / refresh balanced real images using:
 ```powershell
-python scripts\download_ham10000_samples.py --samples-per-class 40
+python scripts/download_ham10000_samples.py --samples-per-class 40
 ```
 
-The downloader uses HAM10000 metadata labels and ISIC image URLs, then writes the files into class folders compatible with `torchvision.datasets.ImageFolder`.
+---
 
-## Latest Training Results
+## Training on Full HAM10000 Data
 
-Run completed on **2026-08-29** using:
-
-```powershell
-python -m src.train --demo --epochs 10
-```
-
-Important: these metrics are from the earlier generated demo dataset run. Since `data/processed` now contains real HAM10000 images, retrain before reporting final real-image metrics.
-
-| Metric | Value |
-|--------|------:|
-| Accuracy | 0.8214 |
-| Weighted precision | 0.8382 |
-| Weighted recall | 0.8214 |
-| Weighted F1 | 0.8001 |
-| Best validation accuracy | 0.8214 |
-| Final validation loss | 0.9976 |
-
-Per-class validation metrics:
-
-| Class | Precision | Recall | F1 | Support |
-|-------|----------:|-------:|---:|--------:|
-| akiec | 1.0000 | 1.0000 | 1.0000 | 6 |
-| bcc | 1.0000 | 1.0000 | 1.0000 | 10 |
-| bkl | 0.7273 | 0.8889 | 0.8000 | 9 |
-| df | 0.6667 | 0.2000 | 0.3077 | 10 |
-| mel | 1.0000 | 1.0000 | 1.0000 | 9 |
-| nv | 0.4545 | 0.8333 | 0.5882 | 6 |
-| vasc | 1.0000 | 1.0000 | 1.0000 | 6 |
-
-Generated artifacts:
-
-| Artifact | File |
-|----------|------|
-| Trained model | `models/skin_cancer_model_20260829_204713.pt` |
-| Default model copy | `models/skin_cancer_model.pt` |
-| Best checkpoint | `models/best_model.pt` |
-| Training loss/accuracy curves | `results/training_history.png` |
-| Confusion matrix | `results/confusion_matrix.png` |
-| Per-class performance chart | `results/per_class_metrics.png` |
-| Full classification report | `results/classification_report.json` |
-| Metrics summary | `results/metrics_summary.json` |
-| Training summary | `results/training_summary.json` |
-
-Classes that were hardest to distinguish in this run:
-
-| Actual class | Predicted as | Count | Rate |
-|--------------|--------------|------:|-----:|
-| df | nv | 5 / 10 | 50.0% |
-| df | bkl | 3 / 10 | 30.0% |
-| nv | df | 1 / 6 | 16.7% |
-| bkl | nv | 1 / 9 | 11.1% |
-
-The main confusion was around benign-looking synthetic classes: `df` was most often mistaken for `nv` and `bkl`, while `nv` and `bkl` each had a smaller number of mistakes involving nearby benign classes.
-
-## Train on Real HAM10000 Data
-
-1. Download from Harvard Dataverse:
+1. Download the complete dataset from Harvard Dataverse:
    https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DBW86T
 
-2. Place files:
+2. Place raw files into `data/raw/`:
    ```
    data/raw/HAM10000_metadata.csv
    data/raw/images/*.jpg
    ```
 
-3. Prepare and train:
+3. Prepare and run training:
    ```powershell
    python scripts/prepare_ham10000.py
    python -m src.train --epochs 25
    ```
 
-## Predict
+---
 
-```powershell
-python -m src.predict path\to\lesion.jpg
-```
+## Clinical Safety, Medical Disclaimer & Ethical Use
 
-## Classes
+> [!WARNING]
+> ### Crucial Medical & Clinical Disclaimer
+> - **Educational & Research Prototype Only:** This project is intended solely for machine learning research, algorithmic transparency analysis, and educational demonstration.
+> - **NOT an FDA-Cleared or CE-Marked Medical Device:** This system has **NOT** undergone clinical trials and has not been cleared or approved by any regulatory health agency.
+> - **Never Use for Self-Diagnosis:** This tool **CANNOT** replace professional in-person medical evaluation, dermoscopy, or biopsy by a board-certified dermatologist or qualified healthcare provider.
+> - **High Risk of False Negatives:** Early or amelanotic melanomas may appear visually benign to convolutional neural networks. A non-malignant AI output must never be interpreted as an "all clear" or evidence of safety.
+> - **Demographic Bias Notice:** Public dermatology datasets (including HAM10000) have well-documented underrepresentation of darker skin tones (Fitzpatrick phototypes IV–VI). Performance on underrepresented groups may be substantially lower.
 
-| Code | Disease | Risk |
-|------|---------|------|
-| mel | Melanoma | Malignant |
-| bcc | Basal Cell Carcinoma | Malignant |
-| akiec | Actinic Keratosis | Pre-cancerous |
-| nv | Melanocytic Nevi | Benign |
-| bkl | Benign Keratosis | Benign |
-| df | Dermatofibroma | Benign |
-| vasc | Vascular Lesion | Benign |
+---
 
-## Disclaimer
+## Legal & Licensing Notice
 
-For **research and educational purposes only**. Not FDA-approved medical software.
+### Code License
+**No open-source code license is granted or invented for this repository.**  
+All rights to the source code, training workflows, and documentation are reserved by the author.
+
+### Third-Party Data Attribution
+- **HAM10000 Dataset:** Tschandl, P., Rosendahl, C. & Kittler, H. *The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions.* Sci. Data 5, 180161 (2018). Licensed under [Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)](https://creativecommons.org/licenses/by-nc/4.0/).
+- **ISIC Archive:** International Skin Imaging Collaboration.

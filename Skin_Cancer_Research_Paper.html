@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skin Cancer Classification Using Transfer Learning on HAM10000 Dermoscopic Images</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        body {
+            font-family: "Charter", "Georgia", "Times New Roman", serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #fff;
+        }
+        h1, h2, h3, h4 {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        h1 {
+            font-size: 26px;
+            line-height: 1.3;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+        }
+        .meta-info {
+            font-family: "Inter", sans-serif;
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 24px;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 6px;
+            border-left: 4px solid #3b82f6;
+        }
+        .meta-info p {
+            margin: 4px 0;
+        }
+        .abstract {
+            background: #f1f5f9;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 24px 0;
+            font-style: normal;
+        }
+        .abstract h2 {
+            font-size: 16px;
+            margin-top: 0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #1e293b;
+        }
+        h2 {
+            font-size: 19px;
+            margin-top: 32px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+        }
+        h3 {
+            font-size: 15px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+        p {
+            margin: 10px 0;
+            text-align: justify;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 18px 0;
+            font-size: 13.5px;
+            font-family: "Inter", sans-serif;
+        }
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        tr:nth-child(even) {
+            background-color: #fcfcfd;
+        }
+        code {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #f1f5f9;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 12.5px;
+            color: #0f172a;
+        }
+        pre {
+            background-color: #0f172a;
+            color: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+        pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        .references p {
+            padding-left: 24px;
+            text-indent: -24px;
+            font-size: 13px;
+        }
+        .figure-box {
+            margin: 20px 0;
+            padding: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+        .figure-title {
+            font-weight: 600;
+            font-size: 13.5px;
+            margin-bottom: 4px;
+        }
+        @media print {
+            body {
+                padding: 0;
+                color: #000;
+            }
+            .meta-info, .abstract, .figure-box {
+                background: #fff;
+                border: 1px solid #ccc;
+            }
+            a {
+                text-decoration: none;
+                color: #000;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Skin Cancer Classification Using Transfer Learning on HAM10000 Dermoscopic Images</h1>
+
+    <div class="meta-info">
+        <p><strong>Date:</strong> August 29, 2026</p>
+        <p><strong>Architecture:</strong> MobileNetV2 Transfer Learning</p>
+        <p><strong>Dataset:</strong> Balanced HAM10000/ISIC sample (280 real dermoscopic images)</p>
+        <p><strong>Diagnostic Classes:</strong> <code>akiec</code>, <code>bcc</code>, <code>bkl</code>, <code>df</code>, <code>mel</code>, <code>nv</code>, <code>vasc</code></p>
+    </div>
+
+    <div class="abstract">
+        <h2>Abstract</h2>
+        <p>
+            This paper presents a machine learning experiment for multi-class skin lesion classification using real dermoscopic images from the HAM10000/ISIC dataset. A MobileNetV2 convolutional neural network pre-trained on ImageNet was adapted for seven lesion categories: actinic keratosis (<code>akiec</code>), basal cell carcinoma (<code>bcc</code>), benign keratosis (<code>bkl</code>), dermatofibroma (<code>df</code>), melanoma (<code>mel</code>), melanocytic nevus (<code>nv</code>), and vascular lesion (<code>vasc</code>). The processed dataset contains 280 real images, balanced to 40 images per class. The model was trained for 10 epochs with an 80/20 train-validation split. On the 56-image validation set, the model achieved 0.5000 accuracy, 0.4305 weighted precision, 0.5000 weighted recall, and 0.4501 weighted F1-score. Error analysis showed that dermatofibroma was the hardest class to distinguish, especially from basal cell carcinoma and melanoma. The results demonstrate that the pipeline is functional but also show the limitations of training a deep learning classifier on a very small real-image sample.
+        </p>
+    </div>
+
+    <h2>1. Introduction</h2>
+    <p>
+        Skin cancer is one of the most common forms of cancer worldwide, and early detection is essential for reducing morbidity and mortality. Dermoscopy improves visual inspection by revealing subsurface lesion structures, but interpretation requires clinical expertise. Machine learning, especially convolutional neural networks (CNNs), has become an important research direction for supporting lesion classification from dermoscopic images.
+    </p>
+    <p>
+        The objective of this project is to build and evaluate a reproducible skin lesion classification pipeline using real HAM10000/ISIC images. The project focuses on seven common lesion categories and reports actual training metrics, confusion matrix findings, and visual performance summaries.
+    </p>
+
+    <h2>2. Literature Review</h2>
+    <p>
+        Deep learning has shown strong potential for skin lesion classification. Esteva et al. (2017) demonstrated dermatologist-level skin cancer classification using a CNN trained on a large clinical image dataset. The study helped establish deep learning as a serious approach for dermatology image analysis.
+    </p>
+    <p>
+        The HAM10000 dataset introduced by Tschandl, Rosendahl, and Kittler (2018) is widely used because it contains 10,015 dermoscopic images across seven diagnostic categories. Its class structure is used in this project. HAM10000 is valuable for benchmarking, but it is naturally imbalanced, with many more nevus images than rare classes such as dermatofibroma and vascular lesions.
+    </p>
+    <p>
+        Codella et al. (2018) described the ISIC 2017 lesion analysis challenge, which standardized tasks such as lesion classification and segmentation. This work showed the importance of shared datasets and reproducible evaluation protocols.
+    </p>
+    <p>
+        Haenssle et al. (2018) compared a CNN with dermatologists for melanoma recognition and found that deep learning systems can perform competitively under controlled experimental conditions. However, such models still require careful validation before clinical use.
+    </p>
+    <p>
+        Adamson and Smith (2018) warned that dermatology AI can worsen health disparities if models are trained on datasets that underrepresent darker skin tones or diverse clinical settings. This is important because many public dermoscopy datasets are not fully representative of real-world populations.
+    </p>
+    <p>
+        Together, the literature supports CNN-based lesion classification as a promising research area, while also emphasizing dataset quality, bias, external validation, and transparent reporting.
+    </p>
+
+    <h2>3. Materials and Methods</h2>
+
+    <h3>3.1 Dataset</h3>
+    <p>
+        The processed dataset was curated with real HAM10000/ISIC dermoscopic images. The dataset is balanced across diagnostic classes for this baseline experiment:
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Class Code</th>
+                <th>Diagnostic Meaning</th>
+                <th style="text-align: right;">Images</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>akiec</code></td><td>Actinic keratosis / intraepithelial carcinoma</td><td style="text-align: right;">40</td></tr>
+            <tr><td><code>bcc</code></td><td>Basal cell carcinoma</td><td style="text-align: right;">40</td></tr>
+            <tr><td><code>bkl</code></td><td>Benign keratosis-like lesion</td><td style="text-align: right;">40</td></tr>
+            <tr><td><code>df</code></td><td>Dermatofibroma</td><td style="text-align: right;">40</td></tr>
+            <tr><td><code>mel</code></td><td>Melanoma</td><td style="text-align: right;">40</td></tr>
+            <tr><td><code>nv</code></td><td>Melanocytic nevus</td><td style="text-align: right;">40</td></tr>
+            <tr><td><code>vasc</code></td><td>Vascular lesion</td><td style="text-align: right;">40</td></tr>
+            <tr><td><strong>Total</strong></td><td><strong>Balanced Sample</strong></td><td style="text-align: right;"><strong>280</strong></td></tr>
+        </tbody>
+    </table>
+
+    <p>The images are stored in <code>data/processed/</code>, downloaded via:</p>
+    <pre><code>python scripts/download_ham10000_samples.py --samples-per-class 40</code></pre>
+
+    <h3>3.2 Model Architecture</h3>
+    <p>
+        The classifier utilizes a MobileNetV2 backbone pre-trained on ImageNet. The convolutional feature extractor was frozen, and the classification head was adapted for 7 lesion classes:
+    </p>
+    <ul>
+        <li>Dropout (0.4)</li>
+        <li>Linear layer (1280 &rarr; 256 units)</li>
+        <li>ReLU Activation</li>
+        <li>Dropout (0.3)</li>
+        <li>Linear output layer (256 &rarr; 7 classes)</li>
+    </ul>
+
+    <h3>3.3 Training Configuration</h3>
+    <table>
+        <thead>
+            <tr><th>Hyperparameter</th><th style="text-align: right;">Value</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Image Resolution</td><td style="text-align: right;">224 &times; 224</td></tr>
+            <tr><td>Batch Size</td><td style="text-align: right;">32</td></tr>
+            <tr><td>Training Epochs</td><td style="text-align: right;">10</td></tr>
+            <tr><td>Optimizer</td><td style="text-align: right;">Adam</td></tr>
+            <tr><td>Learning Rate</td><td style="text-align: right;">0.0001</td></tr>
+            <tr><td>Validation Split</td><td style="text-align: right;">20% (56 validation, 224 training)</td></tr>
+            <tr><td>Execution Device</td><td style="text-align: right;">CPU</td></tr>
+        </tbody>
+    </table>
+
+    <h2>4. Experimental Results</h2>
+
+    <h3>4.1 Overall Metrics</h3>
+    <table>
+        <thead>
+            <tr><th>Metric</th><th style="text-align: right;">Value</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Overall Accuracy</td><td style="text-align: right;">0.5000 (50.0%)</td></tr>
+            <tr><td>Weighted Precision</td><td style="text-align: right;">0.4305</td></tr>
+            <tr><td>Weighted Recall</td><td style="text-align: right;">0.5000</td></tr>
+            <tr><td>Weighted F1-Score</td><td style="text-align: right;">0.4501</td></tr>
+            <tr><td>Best Validation Accuracy</td><td style="text-align: right;">0.5000</td></tr>
+            <tr><td>Final Validation Loss</td><td style="text-align: right;">1.6326</td></tr>
+        </tbody>
+    </table>
+
+    <h3>4.2 Per-Class Results</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th style="text-align: right;">Precision</th>
+                <th style="text-align: right;">Recall</th>
+                <th style="text-align: right;">F1-Score</th>
+                <th style="text-align: right;">Support</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>akiec</code></td><td style="text-align: right;">0.4444</td><td style="text-align: right;">0.6667</td><td style="text-align: right;">0.5333</td><td style="text-align: right;">6</td></tr>
+            <tr><td><code>bcc</code></td><td style="text-align: right;">0.4667</td><td style="text-align: right;">0.7000</td><td style="text-align: right;">0.5600</td><td style="text-align: right;">10</td></tr>
+            <tr><td><code>bkl</code></td><td style="text-align: right;">0.5000</td><td style="text-align: right;">0.3333</td><td style="text-align: right;">0.4000</td><td style="text-align: right;">9</td></tr>
+            <tr><td><code>df</code></td><td style="text-align: right;">0.0000</td><td style="text-align: right;">0.0000</td><td style="text-align: right;">0.0000</td><td style="text-align: right;">10</td></tr>
+            <tr><td><code>mel</code></td><td style="text-align: right;">0.3636</td><td style="text-align: right;">0.4444</td><td style="text-align: right;">0.4000</td><td style="text-align: right;">9</td></tr>
+            <tr><td><code>nv</code></td><td style="text-align: right;">1.0000</td><td style="text-align: right;">0.8333</td><td style="text-align: right;">0.9091</td><td style="text-align: right;">6</td></tr>
+            <tr><td><code>vasc</code></td><td style="text-align: right;">0.5000</td><td style="text-align: right;">0.8333</td><td style="text-align: right;">0.6250</td><td style="text-align: right;">6</td></tr>
+        </tbody>
+    </table>
+
+    <h2>5. Visualizations</h2>
+    <div class="figure-box">
+        <div class="figure-title">Figure 1: Training and Validation Curves</div>
+        <p>File: <code>results/training_history.png</code> &mdash; Illustrates training vs. validation loss and accuracy progression across epochs.</p>
+    </div>
+    <div class="figure-box">
+        <div class="figure-title">Figure 2: Confusion Matrix</div>
+        <p>File: <code>results/confusion_matrix.png</code> &mdash; Details class-level predictions and misclassification frequencies.</p>
+    </div>
+    <div class="figure-box">
+        <div class="figure-title">Figure 3: Per-Class Performance Metrics</div>
+        <p>File: <code>results/per_class_metrics.png</code> &mdash; Displays comparative Precision, Recall, and F1-score across all 7 disease categories.</p>
+    </div>
+
+    <h2>6. Error Analysis</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Actual Class</th>
+                <th>Predicted As</th>
+                <th style="text-align: right;">Misclassified Count</th>
+                <th style="text-align: right;">Error Rate</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>df</code></td><td><code>bcc</code></td><td style="text-align: right;">5 / 10</td><td style="text-align: right;">50.0%</td></tr>
+            <tr><td><code>bkl</code></td><td><code>mel</code></td><td style="text-align: right;">3 / 9</td><td style="text-align: right;">33.3%</td></tr>
+            <tr><td><code>df</code></td><td><code>mel</code></td><td style="text-align: right;">3 / 10</td><td style="text-align: right;">30.0%</td></tr>
+            <tr><td><code>bkl</code></td><td><code>akiec</code></td><td style="text-align: right;">2 / 9</td><td style="text-align: right;">22.2%</td></tr>
+            <tr><td><code>mel</code></td><td><code>bcc</code></td><td style="text-align: right;">2 / 9</td><td style="text-align: right;">22.2%</td></tr>
+            <tr><td><code>mel</code></td><td><code>bkl</code></td><td style="text-align: right;">2 / 9</td><td style="text-align: right;">22.2%</td></tr>
+            <tr><td><code>bcc</code></td><td><code>vasc</code></td><td style="text-align: right;">2 / 10</td><td style="text-align: right;">20.0%</td></tr>
+            <tr><td><code>df</code></td><td><code>akiec</code></td><td style="text-align: right;">2 / 10</td><td style="text-align: right;">20.0%</td></tr>
+        </tbody>
+    </table>
+
+    <p>
+        <strong>Key Findings:</strong>
+        <br>
+        1. <em>Dermatofibroma (<code>df</code>):</em> Suffered from a 0.00 recall rate (100% error), primarily misclassified as basal cell carcinoma (50%) and melanoma (30%).
+        <br>
+        2. <em>Melanoma Sensitivity:</em> Recall was 0.4444. In clinical triage, missing malignant lesions is a critical failure mode that requires cost-sensitive weighting or focal loss.
+        <br>
+        3. <em>Sample Size Bottleneck:</em> The 224 training images provide insufficient feature diversity for fine-grained multi-class lesion boundaries.
+    </p>
+
+    <h2>7. Discussion & Future Work</h2>
+    <p>
+        The pipeline proves functionally robust, producing reproducible training, checkpointing, and evaluation metrics. However, with an accuracy of 50.0% and significant confusion among high-risk categories, the current model cannot be used for clinical triage. Primary improvement pathways include training on the full 10,015 HAM10000 image collection, unfreezing top MobileNetV2 feature layers, integrating focal loss, and deploying Grad-CAM attention visualizations.
+    </p>
+
+    <h2>8. Conclusion</h2>
+    <p>
+        This project demonstrates a complete, transparent, and reproducible end-to-end skin cancer classification baseline. While suitable as an educational research framework, substantial dataset expansion and architectural fine-tuning are required prior to any clinical or medical translation.
+    </p>
+
+    <h2>References</h2>
+    <div class="references">
+        <p>Adamson, A. S., &amp; Smith, A. (2018). Machine learning and health care disparities in dermatology. <em>JAMA Dermatology</em>, 154(11), 1247-1248. https://doi.org/10.1001/jamadermatol.2018.2348</p>
+        <p>Codella, N. C. F., et al. (2018). Skin lesion analysis toward melanoma detection: A challenge at the 2017 International Symposium on Biomedical Imaging. <em>IEEE ISBI</em>, 168-172. https://doi.org/10.1109/ISBI.2018.8363547</p>
+        <p>Esteva, A., et al. (2017). Dermatologist-level classification of skin cancer with deep neural networks. <em>Nature</em>, 542, 115-118. https://doi.org/10.1038/nature21056</p>
+        <p>Haenssle, H. A., et al. (2018). Man against machine: Diagnostic performance of a deep learning convolutional neural network for dermoscopic melanoma recognition in comparison to 58 dermatologists. <em>Annals of Oncology</em>, 29(8), 1836-1842. https://doi.org/10.1093/annonc/mdy166</p>
+        <p>Tschandl, P., Rosendahl, C., &amp; Kittler, H. (2018). The HAM10000 dataset, a large collection of multi-source dermatoscopic images of common pigmented skin lesions. <em>Scientific Data</em>, 5, 180161. https://doi.org/10.1038/sdata.2018.161</p>
+    </div>
+
+</body>
+</html>

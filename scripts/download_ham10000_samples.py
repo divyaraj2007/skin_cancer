@@ -35,6 +35,7 @@ def download_metadata(path: Path) -> Path:
 
 def read_balanced_rows(metadata_path: Path, samples_per_class: int) -> dict[str, list[dict[str, str]]]:
     selected = {label: [] for label in CLASS_LABELS}
+    seen_lesions = set()
 
     with metadata_path.open("r", encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
@@ -45,14 +46,22 @@ def read_balanced_rows(metadata_path: Path, samples_per_class: int) -> dict[str,
 
     for row in rows:
         label = row["dx"]
+        lesion_id = row.get("lesion_id", "")
+        # Data leakage safeguard: enforce 1 image per lesion to avoid cross-split lesion overlap
+        if lesion_id and lesion_id in seen_lesions:
+            continue
+
         if label in selected and len(selected[label]) < samples_per_class:
             selected[label].append(row)
+            if lesion_id:
+                seen_lesions.add(lesion_id)
+
         if all(len(items) >= samples_per_class for items in selected.values()):
             break
 
     missing = {label: samples_per_class - len(items) for label, items in selected.items() if len(items) < samples_per_class}
     if missing:
-        raise RuntimeError(f"Not enough rows for requested sample size: {missing}")
+        raise RuntimeError(f"Not enough unique lesion rows for requested sample size: {missing}")
 
     return selected
 

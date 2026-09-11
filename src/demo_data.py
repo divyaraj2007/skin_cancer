@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-from config import CLASS_LABELS, PROCESSED_DIR, RANDOM_SEED
+from config import CLASS_LABELS, DEMO_DIR, RANDOM_SEED
 
 
 def _color_for_class(label: str, rng: random.Random) -> tuple[int, int, int]:
@@ -56,22 +56,23 @@ def _make_lesion_image(label: str, rng: random.Random, np_rng: np.random.Generat
     return Image.fromarray(arr)
 
 
-def generate_demo_dataset(samples_per_class: int = 40) -> Path:
-    """Create folder structure: data/processed/{class}/*.jpg"""
+def generate_demo_dataset(samples_per_class: int = 40, output_dir: Path | None = None) -> Path:
+    """Create folder structure: data/demo/{class}/*.jpg (isolated from real processed data)."""
+    target_dir = output_dir or DEMO_DIR
     rng = random.Random(RANDOM_SEED)
     np_rng = np.random.default_rng(RANDOM_SEED)
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     for label in CLASS_LABELS:
-        class_dir = PROCESSED_DIR / label
+        class_dir = target_dir / label
         class_dir.mkdir(parents=True, exist_ok=True)
         for i in range(samples_per_class):
             img = _make_lesion_image(label, rng, np_rng)
             img.save(class_dir / f"{label}_{i:03d}.jpg", quality=95)
 
     total = samples_per_class * len(CLASS_LABELS)
-    print(f"Demo dataset ready: {total} images in {PROCESSED_DIR}")
-    return PROCESSED_DIR
+    print(f"Demo dataset ready: {total} images in {target_dir}")
+    return target_dir
 
 
 if __name__ == "__main__":

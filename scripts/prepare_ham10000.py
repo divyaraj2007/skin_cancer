@@ -12,7 +12,11 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
 
@@ -22,6 +26,11 @@ from config import CLASS_LABELS, PROCESSED_DIR, RAW_DIR
 def prepare(raw_dir: Path | None = None, output_dir: Path | None = None) -> Path:
     raw_dir = raw_dir or RAW_DIR
     output_dir = output_dir or PROCESSED_DIR
+
+    resolved_output = output_dir.resolve()
+    resolved_project = PROJECT_ROOT.resolve()
+    if resolved_output == resolved_project or resolved_project not in resolved_output.parents:
+        raise RuntimeError(f"Refusing to clear unexpected path outside project: {resolved_output}")
 
     metadata_path = raw_dir / "HAM10000_metadata.csv"
     images_dir = raw_dir / "images"
