@@ -24,3 +24,21 @@ venv.bak/
 # OS generated
 .DS_Store
 Thumbs.db
+
+# Large / licensed data and generated caches
+data/raw/images/
+data/cache/
+results/runs/*/resume.pt
+results/runs/*/resume.tmp
+
+# Logs and LaTeX build artefacts
+*.log
+dl.err
+paper_overleaf.zip
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.out
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.synctex.gz

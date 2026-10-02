@@ -123,22 +123,33 @@ python scripts/download_ham10000_samples.py --samples-per-class 40
 
 ---
 
-## Training on Full HAM10000 Data
+## Full HAM10000 Benchmark (Conference Paper)
 
-1. Download the complete dataset from Harvard Dataverse:
-   https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DBW86T
+> **Status: work in progress.** The pipeline, split and paper draft are complete. Training runs are still
+> being completed: so far only the frozen-backbone baseline (`results/runs/frozen_ce_s0`) has finished, so
+> the files in `results/paper/` are interim outputs from that baseline, not the paper's final numbers.
 
-2. Place raw files into `data/raw/`:
-   ```
-   data/raw/HAM10000_metadata.csv
-   data/raw/images/*.jpg
-   ```
+This pipeline trains on **all 10,015 HAM10000 images** with a **lesion-level** 70/15/15 split
+(5,228 / 1,121 / 1,121 lesions). HAM10000 has several images per lesion. A naive image-level split puts
+34% of the test images next to images of the same lesion in training, which inflates results.
 
-3. Prepare and run training:
-   ```powershell
-   python scripts/prepare_ham10000.py
-   python -m src.train --epochs 25
-   ```
+| Step | Command | Output |
+|------|---------|--------|
+| 1. Download all images (resumable, ~10 min) | `python scripts/download_ham10000_full.py` | `data/raw/images/` (not committed, CC BY-NC 4.0) |
+| 2. Train all configurations (resumable) | `bash scripts/run_queue.sh` | `results/runs/<config>_s<seed>/` (raw predictions) |
+| 3. Statistics, tables, figures | `python -m src.analysis --primary ft_cw` | `results/paper/` (incl. LaTeX tables/numbers) |
+| 4. Grad-CAM figure | `python -m src.gradcam --checkpoint models/ham10000_ft_cw_s0.pt` | `results/paper/figures/fig7_gradcam.png` |
+| 5. Assemble paper | `python scripts/build_paper.py` | `paper/` + `paper_overleaf.zip` |
+
+All of the above in one go: `bash scripts/run_experiments.sh` (CPU: ~5–6 h; GPU: minutes).
+
+- **Split:** `data/splits/ham10000_lesion_split_seed42.csv` (committed, for exact reproduction), created by `src/ham.py` and checked for zero lesion overlap.
+- **Configurations:** frozen vs fine-tuned MobileNetV2 × plain vs class-weighted cross-entropy; primary model with 3 seeds; plus the same recipe on a leaky image-level split to measure leakage optimism.
+- **Evaluation (`src/analysis.py`):** balanced accuracy, macro-F1, per-class AUC, melanoma and malignant sensitivity/specificity, lesion-level bootstrap 95% CIs, paired bootstrap tests, calibration (ECE, temperature scaling), and a 90%/95%-sensitivity triage operating point.
+- **Dependencies:** metrics are implemented in NumPy (`src/stats.py`, tested in `tests/test_stats.py`), so the pipeline needs neither scikit-learn nor SciPy.
+- **Paper:** IEEE conference LaTeX in `paper/` (`main.tex`, `references.bib`). Every number is generated into `paper/latex/numbers.tex`. Compile on Overleaf by uploading `paper_overleaf.zip`.
+
+The legacy 280-image experiment (`src/train.py`, `data/processed/`, `results/*.png`, `Skin_Cancer_Research_Paper.md`) is kept for reference only.
 
 ---
 
